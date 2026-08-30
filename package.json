@@ -1,0 +1,21 @@
+{
+  "name": "ffmpeg-service",
+  "version": "1.0.0",
+  "description": "Video assembly microservice using FFmpeg — downloads scenes, assembles 9:16 MP4 with subtitles and audio, uploads to Google Drive.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "express": "^4.21.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "googleapis": "^144.0.0",
+    "uuid": "^10.0.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
