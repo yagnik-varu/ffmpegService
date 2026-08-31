@@ -54,3 +54,6 @@ Thumbs.db
 
 # secret file
 secrets/service-account.json
+
+#output file
+output

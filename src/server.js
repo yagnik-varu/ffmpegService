@@ -45,7 +45,6 @@ app.get("/health", (_req, res) => {
 // ── Render endpoint ─────────────────────────────────────
 app.post("/render", async (req, res, next) => {
   try {
-    console.log(req.body, "------------------------------------");
     const { reel_id, total_seconds, audio_drive_file_id, scenes } = req.body;
 
     // ── Validate required fields ────────────────────────
@@ -73,8 +72,7 @@ app.post("/render", async (req, res, next) => {
 
     return res.json({
       success: true,
-      video_url: result.video_url,
-      drive_file_id: result.drive_file_id,
+      ...result,
     });
   } catch (err) {
     next(err);

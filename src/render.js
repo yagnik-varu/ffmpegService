@@ -15,7 +15,7 @@ const os = require("os");
 const { v4: uuidv4 } = require("uuid");
 
 const { downloadFile, downloadGoogleDriveFile } = require("./download");
-const { generateSRT } = require("./srt");
+const { generateSubtitles } = require("./subtitle");
 const { buildAndRun } = require("./assemble");
 const { uploadToDrive, getAuthClient } = require("./upload");
 
@@ -75,15 +75,15 @@ async function render(body) {
       throw err;
     }
 
-    // ── 3. Generate SRT subtitles ───────────────────────────
-    console.log(`\n[STEP 3/5] Generating SRT subtitles...`);
-    const srtPath = path.join(jobDir, "subtitles.srt");
+    // ── 3. Generate ASS subtitles (word-by-word phrases) ────
+    console.log(`\n[STEP 3/5] Generating ASS subtitles (word-by-word)...`);
+    const assPath = path.join(jobDir, "subtitles.ass");
     try {
-      generateSRT(enrichedScenes, srtPath);
-      console.log(`[STEP 3/5 ✅] SRT generated at ${srtPath}`);
+      generateSubtitles(enrichedScenes, assPath);
+      console.log(`[STEP 3/5 ✅] ASS subtitles generated at ${assPath}`);
     } catch (err) {
-      console.error(`[STEP 3/5 ❌] SRT generation failed: ${err.message}`);
-      err.step = "STEP 3: SRT_GENERATION";
+      console.error(`[STEP 3/5 ❌] Subtitle generation failed: ${err.message}`);
+      err.step = "STEP 3: SUBTITLE_GENERATION";
       err.source = "internal";
       throw err;
     }
@@ -102,7 +102,9 @@ async function render(body) {
     }
 
     // ── 5. Upload OR save locally ───────────────────────────
-    const skipUpload = process.env.SKIP_DRIVE_UPLOAD === "true";
+    const skipUpload = body.skip_drive_upload !== undefined 
+      ? String(body.skip_drive_upload) === "true" 
+      : process.env.SKIP_DRIVE_UPLOAD === "true";
 
     if (skipUpload) {
       // ── Local mode: copy to /app/output (mounted from host ./output) ─
