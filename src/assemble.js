@@ -101,10 +101,37 @@ async function buildAndRun(scenes, audioPath, outputPath, totalSeconds) {
     let lastStderr = "";
 
     // Escape the SRT path for the subtitles filter.
-    // FFmpeg on Windows needs colons and backslashes escaped.
+    // On Linux (Docker), paths are already forward-slash based.
+    // Only special chars that need escaping in the filtergraph are: \ : '
     const escapedSrt = srtPath
-      .replace(/\\/g, "/")        // backslash → forward slash
-      .replace(/:/g, "\\:");      // escape colons
+      .replace(/\\/g, "/")          // Windows backslash → forward slash (no-op on Linux)
+      .replace(/'/g, "\\'")         // escape single quotes
+      .replace(/\[/g, "\\[")        // escape square brackets
+      .replace(/\]/g, "\\]");       // escape square brackets
+    // Note: do NOT escape colons on Linux — /tmp/... paths have no colons
+
+    // Subtitle style: bold white text with black background box
+    // IMPORTANT:
+    //   - Do NOT include FontName with spaces (breaks FFmpeg filtergraph parsing)
+    //     libass will use the only installed font (DejaVu Sans) automatically
+    //   - Join with \, (escaped comma) NOT , — commas are filter-chain separators in FFmpeg
+    const subtitleStyle = [
+      "FontSize=18",
+      "Bold=1",
+      "PrimaryColour=&H00FFFFFF",     // white text (ABGR hex)
+      "OutlineColour=&H00000000",     // black outline
+      "BackColour=&H80000000",        // semi-transparent black background
+      "BorderStyle=3",                // box-style background
+      "Outline=2",
+      "Shadow=1",
+      "Alignment=2",                  // bottom-centre (ASS alignment)
+      "MarginV=60",                   // 60px from bottom
+      "MarginL=40",
+      "MarginR=40",
+    ].join("\\,");                    // \, not , — avoids FFmpeg filtergraph splitting
+
+    const filterStr = `subtitles='${escapedSrt}':force_style='${subtitleStyle}'`;
+    console.log(`[assemble] Subtitle filter: ${filterStr}`);
 
     const cmd = ffmpeg()
       // Video input: concat demuxer
@@ -125,13 +152,14 @@ async function buildAndRun(scenes, audioPath, outputPath, totalSeconds) {
         "-map", "1:a:0",
         // Trim the final output to totalSeconds
         "-t", String(totalSeconds),
-        // Burn subtitles
-        "-vf", `subtitles='${escapedSrt}':force_style='FontSize=24,PrimaryColour=&HFFFFFF&,Alignment=2,MarginV=40'`,
+        // Burn subtitles with styling
+        "-vf", filterStr,
         // Shortest — stop when shortest stream ends
         "-shortest",
         // Overwrite
         "-y",
       ]);
+
 
     cmd
       .on("stderr", (line) => {

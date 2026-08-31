@@ -1,0 +1,32 @@
+services:
+  ffmpeg-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: techreel-ffmpeg
+    restart: unless-stopped
+    ports:
+      - "3001:3001"          # expose to host for manual testing
+    environment:
+      - PORT=3001
+      - GOOGLE_SERVICE_ACCOUNT_JSON=/app/service-account.json
+      - GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_VIDEOS_FOLDER_ID}
+      # OAuth2 credentials for uploading to personal Google Drive
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
+      - GOOGLE_OAUTH_REFRESH_TOKEN=${GOOGLE_OAUTH_REFRESH_TOKEN}
+      # Set to 'true' to skip Drive upload and save video locally instead
+      - SKIP_DRIVE_UPLOAD=${SKIP_DRIVE_UPLOAD:-false}
+    volumes:
+      - ./secrets/service-account.json:/app/service-account.json:ro
+      - ffmpeg_tmp:/tmp      # ephemeral render scratch space
+      - ./output:/app/output # rendered videos saved here when SKIP_DRIVE_UPLOAD=true
+    networks:
+      - techreelai_default    # same network as n8n so it can call by service name
+
+volumes:
+  ffmpeg_tmp:
+
+networks:
+  techreelai_default:
+    external: true

@@ -32,10 +32,7 @@ flowchart LR
 docker build -t ffmpeg-service .
 
 # 2. Run
-docker run --rm -p 3001:3001 \
-  -e GOOGLE_DRIVE_FOLDER_ID=your_folder_id \
-  -v /path/to/service_account.json:/run/secrets/service_account.json:ro \
-  ffmpeg-service
+docker run --rm -p 3001:3001 ffmpeg-service
 ```
 
 Or with **Docker Compose** — add to your `docker-compose.yml`:
