@@ -250,21 +250,37 @@ function buildBackgroundBase(scenes, workDir) {
     return backgroundBasePath;
 }
 
+function getAudioDuration(audioPath) {
+    try {
+        const cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`;
+        const output = execSync(cmd).toString().trim();
+        return parseFloat(output);
+    } catch (e) {
+        console.warn(`[assemble] ⚠️ Failed to get audio duration via ffprobe. Fallback to totalSeconds.`);
+        return null;
+    }
+}
+
 /**
  * compositeFinalReel
  * Overlays the transparent ui_overlay.webm onto background_base.mp4,
- * merges audio.mp3, and trims to total_seconds.
+ * merges audio.mp3, and trims to the exact duration of the audio track.
  *
  * @param {string} backgroundBasePath - /tmp/.../background_base.mp4
  * @param {string} overlayWebmPath    - /tmp/.../ui_overlay.webm
  * @param {string} audioPath          - /tmp/.../audio.mp3
- * @param {number} totalSeconds       - exact final duration
+ * @param {number} totalSeconds       - exact final duration (fallback)
  * @param {string} workDir            - /tmp/ffmpeg-job-<uuid>
  * @returns {string}                  - path to final_reel.mp4
  */
 function compositeFinalReel(backgroundBasePath, overlayWebmPath, audioPath, totalSeconds, workDir) {
     const finalPath = path.join(workDir, 'final_reel.mp4');
     const vcodec = process.env.FFMPEG_VCODEC || 'libx264';
+    
+    const rawAudioDuration = getAudioDuration(audioPath);
+    // Add a 0.5s buffer at the end of the video after audio finishes
+    const finalDuration = rawAudioDuration ? rawAudioDuration + 0.5 : totalSeconds;
+    console.log(`[assemble] Audio track duration detected: ${rawAudioDuration}s (Padded final video: ${finalDuration}s)`);
 
     // Log all input files and their sizes
     console.log('[assemble] ── Composite inputs ──');
@@ -294,13 +310,12 @@ function compositeFinalReel(backgroundBasePath, overlayWebmPath, audioPath, tota
         '"[1:v]format=yuva420p[overlay];[0:v][overlay]overlay=0:0[composited]"',
         '-map "[composited]"',
         '-map 2:a',
-        `-t ${totalSeconds}`,
+        `-t ${finalDuration}`,
         `-c:v ${vcodec}`,
         '-preset fast',
         '-crf 20',
         '-c:a aac',
         '-b:a 192k',
-        '-shortest',
         '-movflags +faststart',
         `"${finalPath}"`,
     ].join(' ');

@@ -3,6 +3,7 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
+const { splitIntoChunks } = require('./subtitle');
 
 const TEMPLATE_DIR = path.resolve(__dirname, '../templates');
 const TEMPLATE_HTML = path.join(TEMPLATE_DIR, 'index.html');
@@ -46,16 +47,49 @@ async function renderUIOverlay(scenes, workDir) {
         // Support both "visual_element" (correct) and "vissual_element" (typo in request)
         const visual_element = scene.visual_element || scene.vissual_element || { type: 'text_only', data: '' };
         const { caption, duration_seconds } = scene;
-        console.log("scene", scene)
 
         console.log(`[render-ui] Scene ${i + 1}/${scenes.length} — type: ${visual_element.type} — duration: ${duration_seconds}s`);
 
-        // Write per-scene data.js so the template can read it
+        // ── Build chunk list with start/end times ──
+        // Priority: caption_timestamps (from TTS) > caption_chunks > auto-split
+        let timedChunks; // Array of { text, start, end } (seconds relative to scene start)
+
+        if (scene.caption_timestamps && scene.caption_timestamps.length > 0) {
+            // Option A: TTS-provided word-level timestamps (perfect sync)
+            timedChunks = scene.caption_timestamps.map(ts => ({
+                text: ts.text,
+                start: ts.start,
+                end: ts.end,
+            }));
+            console.log(`[render-ui]   Using TTS timestamps: ${timedChunks.length} chunks`);
+        } else {
+            // Fallback: auto-split and distribute proportionally by character length
+            const chunks = scene.caption_chunks && scene.caption_chunks.length > 0
+                ? scene.caption_chunks
+                : splitIntoChunks(caption || '');
+
+            const totalChars = chunks.reduce((sum, c) => sum + c.length, 0);
+            let cursor = 0;
+            timedChunks = chunks.map(chunk => {
+                const ratio = totalChars > 0 ? (chunk.length / totalChars) : (1 / chunks.length);
+                const chunkDuration = duration_seconds * ratio;
+                const entry = { text: chunk, start: cursor, end: cursor + chunkDuration };
+                cursor += chunkDuration;
+                return entry;
+            });
+            console.log(`[render-ui]   Using proportional timing (no TTS timestamps): ${timedChunks.length} chunks`);
+        }
+
+        timedChunks.forEach((tc, j) => {
+            console.log(`[render-ui]     Chunk ${j + 1}: "${tc.text}" [${tc.start.toFixed(2)}s → ${tc.end.toFixed(2)}s]`);
+        });
+
+        // Write per-scene data.js — initial caption is first chunk
         const sceneData = {
             type: visual_element.type,
             language: visual_element.language || null,
             data: visual_element.data || null,
-            caption: caption || '',
+            caption: timedChunks[0]?.text || '',
         };
 
         const dataJsContent = `window.SCENE_DATA = ${JSON.stringify(sceneData)};`;
@@ -63,19 +97,36 @@ async function renderUIOverlay(scenes, workDir) {
 
         const page = await browser.newPage();
 
-        // Transparent background is handled by CSS and omitBackground: true in page.screenshot()
-
         // Load the template (file:// protocol so local scripts load)
         await page.goto(`file://${TEMPLATE_HTML}`, { waitUntil: 'networkidle0', timeout: 30000 });
 
         // Wait for Prism / Mermaid to finish rendering
         await waitForRenderComplete(page);
 
-        // Calculate how many frames this scene needs
-        const frameCount = Math.round(duration_seconds * FPS);
+        // ── Capture frames with chunk-by-chunk caption updates ──
+        const totalFrames = Math.round(duration_seconds * FPS);
+        let currentChunkIndex = 0;
 
-        // Capture each frame as a PNG
-        for (let f = 0; f < frameCount; f++) {
+        for (let f = 0; f < totalFrames; f++) {
+            // Determine which chunk this frame belongs to using start/end timestamps
+            const elapsedSeconds = f / FPS;
+            let targetChunkIndex = timedChunks.length - 1; // default to last chunk
+            for (let c = 0; c < timedChunks.length; c++) {
+                if (elapsedSeconds < timedChunks[c].end) {
+                    targetChunkIndex = c;
+                    break;
+                }
+            }
+
+            // Update the caption text in the DOM only when the chunk changes
+            if (targetChunkIndex !== currentChunkIndex || f === 0) {
+                currentChunkIndex = targetChunkIndex;
+                const newText = timedChunks[currentChunkIndex]?.text || '';
+                await page.evaluate((text) => {
+                    document.getElementById('caption-text').textContent = text;
+                }, newText);
+            }
+
             const framePath = path.join(framesDir, `frame_${String(globalFrameIndex).padStart(6, '0')}.png`);
             await page.screenshot({
                 path: framePath,
@@ -88,7 +139,7 @@ async function renderUIOverlay(scenes, workDir) {
         }
 
         await page.close();
-        console.log(`[render-ui] Scene ${i + 1} captured — ${frameCount} frames.`);
+        console.log(`[render-ui] Scene ${i + 1} captured — ${totalFrames} frames, ${timedChunks.length} caption chunks.`);
     }
 
     await browser.close();

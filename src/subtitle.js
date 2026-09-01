@@ -45,9 +45,20 @@ function formatTimecodeASS(totalSeconds) {
 function splitIntoChunks(caption, wordsPerChunk = WORDS_PER_CHUNK) {
   const words = caption.trim().split(/\s+/);
   const chunks = [];
+  let currentChunk = [];
 
-  for (let i = 0; i < words.length; i += wordsPerChunk) {
-    chunks.push(words.slice(i, i + wordsPerChunk).join(" "));
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    currentChunk.push(word);
+
+    // Break chunk if we reach the word limit OR if word ends with sentence punctuation (.!?)
+    // Note: /[.!?]$/ ensures we don't break on inline dots like console.log or file.js
+    const endsWithPunctuation = /[.!?]$/.test(word);
+
+    if (currentChunk.length >= wordsPerChunk || endsWithPunctuation || i === words.length - 1) {
+      chunks.push(currentChunk.join(" "));
+      currentChunk = [];
+    }
   }
 
   return chunks;

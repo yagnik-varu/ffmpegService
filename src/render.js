@@ -30,7 +30,7 @@ const { uploadToDrive, getAuthClient } = require("./upload");
  * @returns {Promise<{ video_url: string, drive_file_id: string }>}
  */
 async function render(body) {
-  const { reel_id, total_seconds, audio_drive_file_id, scenes } = body;
+  const { reel_id, total_seconds, audio_drive_file_id, timestamps_drive_file_id, scenes } = body;
   const jobId = uuidv4();
   const jobDir = path.join(os.tmpdir(), `ffmpeg-job-${jobId}`);
 
@@ -75,6 +75,28 @@ async function render(body) {
       throw err;
     }
 
+    // ── 2b. Download & parse word-level timestamps (optional) ─
+    if (timestamps_drive_file_id) {
+      console.log(`\n[STEP 2b] Downloading word timestamps from Google Drive (File ID: ${timestamps_drive_file_id})...`);
+      const tsPath = path.join(jobDir, `${reel_id}_ts.json`);
+      try {
+        const googleAuth = getAuthClient();
+        await downloadGoogleDriveFile(timestamps_drive_file_id, tsPath, googleAuth);
+        const wordTimestamps = JSON.parse(fs.readFileSync(tsPath, 'utf8'));
+        console.log("worldTimestamps")
+        console.log(`[STEP 2b ✅] Loaded ${wordTimestamps.length} word timestamps.`);
+
+        // ── Map word timestamps to scenes and group into ~4-word chunks ──
+        console.log()
+        enrichedScenes = assignTimestampsToScenes(enrichedScenes, wordTimestamps);
+      } catch (err) {
+        console.warn(`[STEP 2b ⚠️] Timestamp download/parse failed: ${err.message} — falling back to proportional timing.`);
+        // Non-fatal: continue without timestamps, render-ui.js will use proportional fallback
+      }
+    } else {
+      console.log('[STEP 2b] No timestamps_drive_file_id provided — using proportional caption timing.');
+    }
+
     // ── 3. Render DOM UI overlay via Puppeteer ──────────────
     console.log(`\n[STEP 3/5] Rendering UI overlay (Puppeteer)...`);
     let overlayWebmPath;
@@ -94,16 +116,16 @@ async function render(body) {
     try {
       console.log('[render] Building background base...');
       const backgroundBasePath = buildBackgroundBase(enrichedScenes, jobDir);
-      
+
       console.log('[render] Compositing final reel...');
       const finalPath = compositeFinalReel(
-          backgroundBasePath,
-          overlayWebmPath,
-          audioPath,
-          total_seconds,
-          jobDir
+        backgroundBasePath,
+        overlayWebmPath,
+        audioPath,
+        total_seconds,
+        jobDir
       );
-      
+
       // Rename final_reel.mp4 to our target outputPath
       fs.renameSync(finalPath, outputPath);
       console.log(`[STEP 4/5 ✅] Video assembly complete → ${outputPath}`);
@@ -115,8 +137,8 @@ async function render(body) {
     }
 
     // ── 5. Upload OR save locally ───────────────────────────
-    const skipUpload = body.skip_drive_upload !== undefined 
-      ? String(body.skip_drive_upload) === "true" 
+    const skipUpload = body.skip_drive_upload !== undefined
+      ? String(body.skip_drive_upload) === "true"
       : process.env.SKIP_DRIVE_UPLOAD === "true";
 
     if (skipUpload) {
@@ -176,6 +198,67 @@ async function render(body) {
       console.error(`[CLEANUP WARNING] ${cleanupErr.message}`);
     }
   }
+}
+
+/**
+ * Maps flat word-level timestamps to scenes and groups them into chunks.
+ *
+ * @param {Array} scenes - Array of scene objects with duration_seconds
+ * @param {Array} wordTimestamps - Flat array of { word, start, end } objects
+ * @returns {Array} - Enriched scenes with caption_timestamps array
+ */
+function assignTimestampsToScenes(scenes, wordTimestamps) {
+  const WORDS_PER_CHUNK = 4;
+  let wordIdx = 0;
+  let currentSceneStartTime = 0;
+
+  return scenes.map((scene) => {
+    const sceneEndTime = currentSceneStartTime + scene.duration_seconds;
+    const sceneWords = [];
+
+    // Collect words that belong to this scene
+    while (wordIdx < wordTimestamps.length) {
+      const word = wordTimestamps[wordIdx];
+      // A word belongs to this scene if its start time is before the scene's end time
+      if (word.start < sceneEndTime) {
+        sceneWords.push(word);
+        wordIdx++;
+      } else {
+        break;
+      }
+    }
+
+    // Group words into chunks
+    const caption_timestamps = [];
+    let currentChunkWords = [];
+
+    for (let i = 0; i < sceneWords.length; i++) {
+      const w = sceneWords[i];
+      currentChunkWords.push(w);
+
+      const wordText = w.word.trim();
+      // Break chunk if we reach the word limit OR if word ends with sentence punctuation (.!?)
+      // Note: /[.!?]$/ ensures we don't break on inline dots like console.log or file.js
+      const endsWithPunctuation = /[.!?]$/.test(wordText);
+
+      if (currentChunkWords.length >= WORDS_PER_CHUNK || endsWithPunctuation || i === sceneWords.length - 1) {
+        const text = currentChunkWords.map(cw => cw.word).join(' ');
+        // Make times relative to the scene's start time and bound them
+        const start = Math.max(0, currentChunkWords[0].start - currentSceneStartTime);
+        const end = Math.min(scene.duration_seconds, currentChunkWords[currentChunkWords.length - 1].end - currentSceneStartTime);
+        
+        caption_timestamps.push({ text, start, end });
+        currentChunkWords = [];
+      }
+    }
+
+    currentSceneStartTime = sceneEndTime;
+
+    return {
+      ...scene,
+      caption_timestamps
+    };
+  });
 }
 
 module.exports = { render };
