@@ -1,194 +1,117 @@
-# ffmpeg-service
+# FFmpeg Video Rendering Service
 
-A self-contained Node.js microservice that assembles short-form vertical videos (9:16) from individual scene clips, overlays subtitles, mixes in background audio, and uploads the finished MP4 to Google Drive.
+A Node.js microservice running in a Dockerized Alpine Linux container, designed to automatically generate and assemble short-form video reels (e.g., TikToks, YouTube Shorts, Instagram Reels) using FFmpeg.
 
-## Architecture
+## Features
 
-```mermaid
-flowchart LR
-    A["POST /render"] --> B["download.js<br/>Fetch scenes + audio"]
-    B --> C["srt.js<br/>Generate subtitles"]
-    C --> D["assemble.js<br/>FFmpeg 2-pass pipeline"]
-    D --> E["upload.js<br/>Google Drive upload"]
-    E --> F["JSON response<br/>{ video_url, drive_file_id }"]
-```
+- **Automated Video Assembly**: Concatenates multiple scene clips into a single video.
+- **Dynamic Word-by-Word Subtitles**: Automatically chunks text and generates ASS subtitles with fade-in animations, perfectly synced to speech timing, and styled with opaque background boxes.
+- **Blurred Backgrounds**: Automatically scales horizontal/landscape video clips and adds a visually appealing blurred background effect to fill the 1080x1920 vertical format (replacing ugly black padding).
+- **Google Drive Integration**: Fetches audio tracks directly from Google Drive and uploads the final assembled video back to a Google Drive folder using OAuth2 delegation.
+- **Local Testing Mode**: Ability to skip Google Drive upload and save the rendered video to a local `./output/` directory for fast testing.
+- **Dockerized Environment**: Bundles `ffmpeg`, `libass`, `fontconfig`, and the `DejaVu Sans` font ensuring consistent and reproducible rendering across any host machine.
 
-**Render pipeline (per job):**
+## Pipeline Overview
 
-1. **Download** — each scene video from its public URL; audio from Google Drive by file ID  
-2. **SRT** — build a subtitle file with cumulative timecodes from scene captions  
-3. **Assemble** — FFmpeg two-pass:  
-   - Pass 1: trim, scale to 1080×1920, pad with black for each scene  
-   - Pass 2: concatenate scenes, mix audio, burn subtitles → final MP4  
-4. **Upload** — push MP4 to a Google Drive folder, set public sharing  
-5. **Cleanup** — delete all temp files for the job (always, even on failure)
+When the `/render` API endpoint is called, the service executes a 5-step pipeline:
 
----
+1. **Download Scenes**: Downloads all provided video clips via their external URLs to a temporary job directory.
+2. **Download Audio**: Authenticates via Google Service Account and downloads the background audio track from Google Drive.
+3. **Generate Subtitles**: Parses the text captions, calculates proportional timings, and generates a `.ass` (Advanced SubStation Alpha) subtitle file with word-by-word fade-in animations.
+4. **FFmpeg Assembly**:
+   - Scales and blurs the background.
+   - Overlays the foreground.
+   - Concatenates the scenes.
+   - Burns the `.ass` subtitles directly onto the video.
+   - Merges the audio track.
+5. **Upload & Cleanup**: Uploads the final `.mp4` to Google Drive (or saves locally) and forcefully cleans up the temporary `/tmp/ffmpeg-job-*` directory.
 
-## Quick Start (Docker)
+## Getting Started
 
-```bash
-# 1. Build
-docker build -t ffmpeg-service .
+### Prerequisites
 
-# 2. Run
-docker run --rm -p 3001:3001 ffmpeg-service
-```
+- Docker and Docker Compose
+- Google Cloud Platform Service Account Key (`service-account.json`)
+- Google OAuth2 Client ID and Secret (for Google Drive upload quota workaround)
 
-Or with **Docker Compose** — add to your `docker-compose.yml`:
+### Configuration
 
-```yaml
-services:
-  ffmpeg-service:
-    build: .
-    ports:
-      - "3001:3001"
-    environment:
-      - GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID}
-      - GOOGLE_SERVICE_ACCOUNT_JSON=/run/secrets/service_account.json
-    secrets:
-      - service_account
-
-secrets:
-  service_account:
-    file: ./service_account.json
-```
-
-Then run:
+Copy `.env.example` to `.env` and fill in the values:
 
 ```bash
-docker compose up --build
+cp .env.example .env
 ```
 
----
+Key environment variables:
+- `PORT`: Port the service listens on (default: `3001`).
+- `GOOGLE_SERVICE_ACCOUNT_JSON`: Path to your service account key.
+- `GOOGLE_DRIVE_FOLDER_ID`: The target Drive folder for output videos.
+- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`: OAuth2 credentials for uploading.
+- `SKIP_DRIVE_UPLOAD`: Set to `true` to save videos locally to `./output/` instead of uploading.
 
-## Environment Variables
+### Running the Service
 
-| Variable | Required | Description |
-|---|---|---|
-| `PORT` | No | Server port (default: `3001`) |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Yes | Absolute path to the Google service-account JSON key file |
-| `GOOGLE_DRIVE_FOLDER_ID` | Yes | Target Google Drive folder ID for uploads |
+Start the service using Docker Compose:
 
-Copy `.env.example` to `.env` and fill in your values.
+```bash
+docker compose up -d --build
+```
 
----
+The service will be available at `http://localhost:3001`.
 
-## API Reference
+### Testing the UI Rendering Pipeline (Puppeteer)
 
-### `GET /health`
+To specifically test the headless browser UI overlay rendering without running the full API, you can build and run the test container. The command mounts a volume so the generated WebM video is saved to your host machine:
 
-Liveness probe.
+```powershell
+# 1. Build the test image
+docker build -t ffmpeg-puppeteer-test .
 
-**Response** `200 OK`
+# 2. Run the test script and output to the local test_output_workspace folder
+docker run --rm -v "${PWD}\test_output_workspace:/app/test_output_workspace" ffmpeg-puppeteer-test node test-render-ui.js
+```
+
+## API Documentation
+
+### POST `/render`
+
+Initiates the video rendering pipeline.
+
+**Payload Example:**
 
 ```json
 {
-  "status": "ok",
-  "timestamp": "2025-01-15T12:00:00.000Z"
-}
-```
-
----
-
-### `POST /render`
-
-Submit a reel for rendering.
-
-**Request body:**
-
-```json
-{
-  "reel_id": "reel_XXXXXXXXX",
-  "total_seconds": 45,
-  "audio_drive_file_id": "GOOGLE_DRIVE_FILE_ID",
+  "reel_id": "my_awesome_reel",
+  "total_seconds": 15,
+  "audio_drive_file_id": "1abcXYZ_drive_file_id_here",
+  "skip_drive_upload": false,
   "scenes": [
     {
-      "scene_number": 1,
-      "video_url": "https://videos.pexels.com/...",
-      "caption": "Did you know AI can now Google things before answering?",
-      "duration_seconds": 15
+      "duration_seconds": 5,
+      "caption": "Did you know that AI can now render videos automatically?",
+      "video_url": "https://example.com/videos/scene1.mp4"
     },
     {
-      "scene_number": 2,
-      "video_url": "https://videos.pexels.com/...",
-      "caption": "It's called Grounding — and it changes everything.",
-      "duration_seconds": 15
-    },
-    {
-      "scene_number": 3,
-      "video_url": "https://videos.pexels.com/...",
-      "caption": "Follow for more AI tips!",
-      "duration_seconds": 15
+      "duration_seconds": 10,
+      "caption": "It generates word by word subtitles with a blurred background!",
+      "video_url": "https://example.com/videos/scene2.mp4"
     }
   ]
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `reel_id` | string | Unique identifier for this reel |
-| `total_seconds` | number | Desired total video length |
-| `audio_drive_file_id` | string | Google Drive file ID for the background audio |
-| `scenes` | array | Ordered list of scenes |
-| `scenes[].scene_number` | number | Scene index (informational) |
-| `scenes[].video_url` | string | Public URL to the source video clip |
-| `scenes[].caption` | string | Subtitle text for this scene |
-| `scenes[].duration_seconds` | number | How long this scene should be |
+**Parameters:**
+- `reel_id`: Unique identifier for the output video.
+- `total_seconds`: The total duration to trim the final video to.
+- `audio_drive_file_id`: The ID of the audio file hosted on Google Drive.
+- `skip_drive_upload`: (Optional) Boolean to override the `.env` upload setting per request.
+- `scenes`: Array of scene objects, each containing:
+  - `duration_seconds`: How long the scene should play.
+  - `caption`: The text to display over the scene (will be chunked automatically).
+  - `caption_chunks`: (Optional) Pre-chunked array of phrases if you want precise control over the word chunks.
+  - `video_url`: Direct URL to the raw video `.mp4`.
 
-**Success response** `200 OK`
+## Troubleshooting
 
-```json
-{
-  "success": true,
-  "video_url": "https://drive.google.com/file/d/.../view?usp=sharing",
-  "drive_file_id": "1AbCdEfGhIjKlMnOpQrStUvWxYz"
-}
-```
-
-**Error response** `400` or `500`
-
-```json
-{
-  "success": false,
-  "error": "Descriptive error message"
-}
-```
-
----
-
-## File Structure
-
-```
-ffmpeg-service/
-├── Dockerfile
-├── package.json
-├── .env.example
-├── README.md
-└── src/
-    ├── server.js      Express app & entry point
-    ├── render.js       Orchestration pipeline
-    ├── download.js     URL + Google Drive file downloaders
-    ├── assemble.js     FFmpeg command builder & executor
-    ├── upload.js       Google Drive uploader
-    └── srt.js          SRT subtitle file generator
-```
-
----
-
-## Local Development (without Docker)
-
-```bash
-cd ffmpeg-service
-npm install
-
-# Make sure ffmpeg is on your PATH
-ffmpeg -version
-
-# Set env vars
-export GOOGLE_SERVICE_ACCOUNT_JSON=/path/to/service_account.json
-export GOOGLE_DRIVE_FOLDER_ID=your_folder_id
-
-npm start
-# → ffmpeg-service listening on port 3001
-```
+- **Subtitles not appearing**: Check the generated `.ass` file in the FFmpeg logs. Ensure `fontconfig` and `ttf-dejavu` are properly installed in the Dockerfile.
+- **Drive Upload Quota Errors**: Google Drive restricts Service Accounts from uploading files. You must use the OAuth2 delegation flow (`scripts/get-oauth-token.js`) to generate a refresh token.
