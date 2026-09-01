@@ -58,11 +58,28 @@ app.post("/render", async (req, res, next) => {
 
     for (let i = 0; i < scenes.length; i++) {
       const s = scenes[i];
-      if (!s.video_url || !s.caption || !s.duration_seconds) {
+      if (!s.video_url || s.caption === undefined || !s.duration_seconds) {
         return res.status(400).json({
           success: false,
           error: `Scene ${i + 1} is missing required fields: video_url, caption, duration_seconds`,
         });
+      }
+
+      if (s.visual_element) {
+        const { type, data } = s.visual_element;
+        const validTypes = ['code_snippet', 'architecture_diagram', 'text_only'];
+        if (!type || !validTypes.includes(type)) {
+          return res.status(400).json({
+            success: false,
+            error: `Scene ${i + 1} has invalid or missing visual_element.type. Must be one of: ${validTypes.join(', ')}`,
+          });
+        }
+        if (type !== 'text_only' && typeof data !== 'string') {
+          return res.status(400).json({
+            success: false,
+            error: `Scene ${i + 1} is missing visual_element.data (must be a string) required for type '${type}'`,
+          });
+        }
       }
     }
 
