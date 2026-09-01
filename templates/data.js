@@ -1,1 +1,1 @@
-window.SCENE_DATA = {"type":"code_snippet","language":"javascript","data":"function futuristic() {\n  return 'Engaging UI';\n}","caption":"Welcome to our futuristic codebase!"};
+window.SCENE_DATA = {"type":"text_only","language":"javascript","data":null,"caption":"Shallow copies are fast and lightweight, but only for flat data. Save this post so you don't break your state management next time!"};

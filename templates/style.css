@@ -35,9 +35,10 @@ html, body {
 /* ── Visual overlay: occupies upper 60% ── */
 #visual-area {
   position: absolute;
-  top: 120px;
+  top: 50%;
   left: 60px;
   right: 60px;
+  transform: translateY(-50%);
   max-height: 1100px;
   display: flex;
   align-items: center;

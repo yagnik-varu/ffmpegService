@@ -18,6 +18,7 @@ ENV GOOGLE_SERVICE_ACCOUNT_JSON=/app/service_account.json
 ENV GOOGLE_DRIVE_FOLDER_ID=1ptnRDhMy9L5__BIWyNF6piaxsDiUAWhL
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV FFMPEG_VCODEC=libx264
 
 # Install deps first (layer-cached when package.json hasn't changed)
 COPY package.json ./

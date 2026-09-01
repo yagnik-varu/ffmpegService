@@ -6,7 +6,6 @@
  *
  * All errors are caught and returned as JSON (never HTML stack traces).
  */
-
 const express = require("express");
 const { render } = require("./render");
 

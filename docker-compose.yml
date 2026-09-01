@@ -17,6 +17,7 @@ services:
       - GOOGLE_OAUTH_REFRESH_TOKEN=${GOOGLE_OAUTH_REFRESH_TOKEN}
       # Set to 'true' to skip Drive upload and save video locally instead
       - SKIP_DRIVE_UPLOAD=${SKIP_DRIVE_UPLOAD:-false}
+      - FFMPEG_VCODEC=${FFMPEG_VCODEC:-libx264}
     volumes:
       - ./secrets/service-account.json:/app/service-account.json:ro
       - ffmpeg_tmp:/tmp      # ephemeral render scratch space

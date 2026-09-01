@@ -43,7 +43,10 @@ async function renderUIOverlay(scenes, workDir) {
 
     for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i];
-        const { visual_element, caption, duration_seconds } = scene;
+        // Support both "visual_element" (correct) and "vissual_element" (typo in request)
+        const visual_element = scene.visual_element || scene.vissual_element || { type: 'text_only', data: '' };
+        const { caption, duration_seconds } = scene;
+        console.log("scene", scene)
 
         console.log(`[render-ui] Scene ${i + 1}/${scenes.length} — type: ${visual_element.type} — duration: ${duration_seconds}s`);
 

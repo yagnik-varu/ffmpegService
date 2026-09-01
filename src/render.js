@@ -15,8 +15,8 @@ const os = require("os");
 const { v4: uuidv4 } = require("uuid");
 
 const { downloadFile, downloadGoogleDriveFile } = require("./download");
-const { generateSubtitles } = require("./subtitle");
-const { buildAndRun } = require("./assemble");
+const { renderUIOverlay } = require("./render-ui");
+const { buildBackgroundBase, compositeFinalReel } = require("./assemble");
 const { uploadToDrive, getAuthClient } = require("./upload");
 
 /**
@@ -75,24 +75,37 @@ async function render(body) {
       throw err;
     }
 
-    // ── 3. Generate ASS subtitles (word-by-word phrases) ────
-    console.log(`\n[STEP 3/5] Generating ASS subtitles (word-by-word)...`);
-    const assPath = path.join(jobDir, "subtitles.ass");
+    // ── 3. Render DOM UI overlay via Puppeteer ──────────────
+    console.log(`\n[STEP 3/5] Rendering UI overlay (Puppeteer)...`);
+    let overlayWebmPath;
     try {
-      generateSubtitles(enrichedScenes, assPath);
-      console.log(`[STEP 3/5 ✅] ASS subtitles generated at ${assPath}`);
+      overlayWebmPath = await renderUIOverlay(enrichedScenes, jobDir);
+      console.log(`[STEP 3/5 ✅] UI overlay rendered at ${overlayWebmPath}`);
     } catch (err) {
-      console.error(`[STEP 3/5 ❌] Subtitle generation failed: ${err.message}`);
-      err.step = "STEP 3: SUBTITLE_GENERATION";
-      err.source = "internal";
+      console.error(`[STEP 3/5 ❌] UI overlay generation failed: ${err.message}`);
+      err.step = "STEP 3: RENDER_UI_OVERLAY";
+      err.source = "puppeteer";
       throw err;
     }
 
-    // ── 4. Assemble video ───────────────────────────────────
-    console.log(`\n[STEP 4/5] Assembling video with FFmpeg (Pass 1 trim/scale + Pass 2 concat/audio/subtitles)...`);
+    // ── 4. Assemble Background Base & Composite Video ───────
+    console.log(`\n[STEP 4/5] Assembling background and compositing final video...`);
     const outputPath = path.join(jobDir, `${reel_id}.mp4`);
     try {
-      await buildAndRun(enrichedScenes, audioPath, outputPath, total_seconds);
+      console.log('[render] Building background base...');
+      const backgroundBasePath = buildBackgroundBase(enrichedScenes, jobDir);
+      
+      console.log('[render] Compositing final reel...');
+      const finalPath = compositeFinalReel(
+          backgroundBasePath,
+          overlayWebmPath,
+          audioPath,
+          total_seconds,
+          jobDir
+      );
+      
+      // Rename final_reel.mp4 to our target outputPath
+      fs.renameSync(finalPath, outputPath);
       console.log(`[STEP 4/5 ✅] Video assembly complete → ${outputPath}`);
     } catch (err) {
       console.error(`[STEP 4/5 ❌] FFmpeg assembly failed: ${err.message}`);
