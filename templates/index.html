@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UI Overlay Canvas</title>
+
+  <!-- Prism.js for code syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+
+  <!-- Mermaid.js for architecture diagrams -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 1080x1920 canvas — transparent background for Puppeteer WebM capture -->
+  <div id="canvas">
+
+    <!-- TOP: Visual overlay area (code or diagram) -->
+    <div id="visual-area">
+      <!-- Injected by script.js based on visual_element.type -->
+    </div>
+
+    <!-- BOTTOM: Caption bar -->
+    <div id="caption-bar">
+      <p id="caption-text"></p>
+    </div>
+
+  </div>
+
+  <!-- Data injected by render-ui.js via file:// or inline script tag -->
+  <script src="data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
