@@ -1,9 +1,11 @@
 services:
   ffmpeg-service:
+    environment:
+      - NVIDIA_DRIVER_CAPABILITIES=all
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
               count: 1
-              capabilities: [gpu]
+              capabilities: [gpu, video, utility]

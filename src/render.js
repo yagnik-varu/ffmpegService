@@ -18,6 +18,7 @@ const { downloadFile, downloadGoogleDriveFile } = require("./download");
 const { renderUIOverlay } = require("./render-ui");
 const { buildBackgroundBase, compositeFinalReel } = require("./assemble");
 const { uploadToDrive, getAuthClient } = require("./upload");
+const { resolveBackground } = require("./services/background");
 
 /**
  * Run the full render pipeline for a single reel.
@@ -41,23 +42,21 @@ async function render(body) {
   fs.mkdirSync(jobDir, { recursive: true });
 
   try {
-    // ── 1. Download scene videos ────────────────────────────
-    console.log(`\n[STEP 1/5] Downloading ${scenes.length} scene clip(s)...`);
+    // ── 1. Download/Generate scene backgrounds ────────────────────────────
+    console.log(`\n[STEP 1/5] Processing backgrounds for ${scenes.length} scene(s)...`);
     let enrichedScenes;
     try {
       enrichedScenes = await Promise.all(
         scenes.map(async (scene, i) => {
-          const ext = ".mp4";
-          const dest = path.join(jobDir, `raw_scene_${i}${ext}`);
-          await downloadFile(scene.video_url, dest);
-          return { ...scene, video_path: dest };
+          const { type, video_path } = await resolveBackground(scene, i, jobDir);
+          return { ...scene, background_type: type, video_path };
         })
       );
-      console.log(`[STEP 1/5 ✅] All ${scenes.length} scene clip(s) downloaded successfully.`);
+      console.log(`[STEP 1/5 ✅] All ${scenes.length} scene background(s) processed successfully.`);
     } catch (err) {
-      console.error(`[STEP 1/5 ❌] Failed to download scene clips: ${err.message}`);
-      err.step = "STEP 1: DOWNLOAD_SCENE_VIDEOS";
-      if (!err.source) err.source = "external_url";
+      console.error(`[STEP 1/5 ❌] Failed to process scene backgrounds: ${err.message}`);
+      err.step = "STEP 1: PROCESS_SCENE_BACKGROUNDS";
+      if (!err.source) err.source = "internal";
       throw err;
     }
 
@@ -212,15 +211,16 @@ function assignTimestampsToScenes(scenes, wordTimestamps) {
   let wordIdx = 0;
   let currentSceneStartTime = 0;
 
-  return scenes.map((scene) => {
+  return scenes.map((scene, sceneIndex) => {
     const sceneEndTime = currentSceneStartTime + scene.duration_seconds;
     const sceneWords = [];
+    const isLastScene = sceneIndex === scenes.length - 1;
 
     // Collect words that belong to this scene
     while (wordIdx < wordTimestamps.length) {
       const word = wordTimestamps[wordIdx];
-      // A word belongs to this scene if its start time is before the scene's end time
-      if (word.start < sceneEndTime) {
+      // A word belongs to this scene if its start time is before the scene's end time, OR if this is the last scene
+      if (word.start < sceneEndTime || isLastScene) {
         sceneWords.push(word);
         wordIdx++;
       } else {

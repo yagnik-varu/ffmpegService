@@ -57,10 +57,27 @@ app.post("/render", async (req, res, next) => {
 
     for (let i = 0; i < scenes.length; i++) {
       const s = scenes[i];
-      if (!s.video_url || s.caption === undefined || !s.duration_seconds) {
+      if (!s.background || typeof s.background !== 'object' || s.caption === undefined || !s.duration_seconds) {
         return res.status(400).json({
           success: false,
-          error: `Scene ${i + 1} is missing required fields: video_url, caption, duration_seconds`,
+          error: `Scene ${i + 1} is missing required fields: background (object), caption, duration_seconds`,
+        });
+      }
+
+      const { canvas_color_theme, resolved_video_url } = s.background;
+      const validThemes = ['cyber_blue', 'hacker_green', 'error_red', 'dark_minimal', 'none'];
+      
+      if (!validThemes.includes(canvas_color_theme)) {
+        return res.status(400).json({
+          success: false,
+          error: `Scene ${i + 1} has invalid background.canvas_color_theme. Must be one of: ${validThemes.join(', ')}`,
+        });
+      }
+
+      if (canvas_color_theme === 'none' && (!resolved_video_url || typeof resolved_video_url !== 'string')) {
+        return res.status(400).json({
+          success: false,
+          error: `Scene ${i + 1} is using 'none' canvas theme but missing valid background.resolved_video_url`,
         });
       }
 

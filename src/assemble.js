@@ -181,12 +181,19 @@ function buildBackgroundBase(scenes, workDir) {
         const inputStats = fs.statSync(inputPath);
         console.log(`[assemble] Input: ${inputPath} (${(inputStats.size / 1024 / 1024).toFixed(2)} MB)`);
 
-        const vfFilters = [
-            'scale=1080:1920:force_original_aspect_ratio=increase',
-            'crop=1080:1920',
-            'boxblur=8:8',
-            'colorchannelmixer=rr=0.45:gg=0.45:bb=0.45',
-        ].join(',');
+        let vfFilters = '';
+        if (scene.background_type === 'canvas') {
+            // Canvas backgrounds are already exact size, just scale/crop to be safe, no blur or darken.
+            vfFilters = 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920';
+        } else {
+            // Pexels videos get blurred and darkened
+            vfFilters = [
+                'scale=1080:1920:force_original_aspect_ratio=increase',
+                'crop=1080:1920',
+                'boxblur=8:8',
+                'colorchannelmixer=rr=0.45:gg=0.45:bb=0.45',
+            ].join(',');
+        }
 
         // Scale to fill 1080x1920, blur, darken
         // Use -stream_loop -1 before -i so if the video is shorter than duration_seconds, it loops
