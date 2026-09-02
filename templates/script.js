@@ -17,6 +17,11 @@
 
   const visualArea = document.getElementById('visual-area');
   const captionText = document.getElementById('caption-text');
+  const canvas = document.getElementById('canvas');
+
+  if (scene.layout_mode === 'center_text') {
+    canvas.classList.add('layout-center-text');
+  }
 
   // ── Set caption ──
   captionText.textContent = scene.caption || '';

@@ -97,6 +97,16 @@ app.post("/render", async (req, res, next) => {
           });
         }
       }
+
+      if (s.layout_mode) {
+        const validLayouts = ['center_text', 'split_bottom_captions'];
+        if (!validLayouts.includes(s.layout_mode)) {
+          return res.status(400).json({
+            success: false,
+            error: `Scene ${i + 1} has invalid layout_mode. Must be one of: ${validLayouts.join(', ')}`,
+          });
+        }
+      }
     }
 
     // ── Run pipeline ────────────────────────────────────

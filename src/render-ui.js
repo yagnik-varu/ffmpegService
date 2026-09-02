@@ -90,6 +90,7 @@ async function renderUIOverlay(scenes, workDir) {
             language: visual_element.language || null,
             data: visual_element.data || null,
             caption: timedChunks[0]?.text || '',
+            layout_mode: scene.layout_mode || 'split_bottom_captions',
         };
 
         const dataJsContent = `window.SCENE_DATA = ${JSON.stringify(sceneData)};`;
