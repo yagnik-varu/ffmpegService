@@ -11,15 +11,16 @@ const FPS = 30;
  * Generate an animated canvas background MP4 using Puppeteer frame-by-frame + FFmpeg.
  *
  * @param {string} theme           - Canvas color theme (e.g., cyber_blue)
+ * @param {string} emotion         - Scene emotion (e.g., neutral, danger, solution, curious)
  * @param {number} durationSeconds - Duration of the background
  * @param {string} outputPath      - Where to save the generated MP4
  * @returns {Promise<string>}      - The path to the generated MP4
  */
-async function generateCanvasBackground(theme, durationSeconds, outputPath) {
+async function generateCanvasBackground(theme, emotion, durationSeconds, outputPath) {
   const vcodec = process.env.FFMPEG_VCODEC || 'libx264';
   const jobDir = path.dirname(outputPath);
   
-  console.log(`[canvasBackground] Generating animated CSS canvas (${theme}) for ${durationSeconds}s...`);
+  console.log(`[canvasBackground] Generating animated canvas (theme: ${theme} | emotion: ${emotion}) for ${durationSeconds}s...`);
 
   const framesDir = path.join(jobDir, `canvas_frames_${path.basename(outputPath, '.mp4')}`);
   fs.mkdirSync(framesDir, { recursive: true });
@@ -45,7 +46,8 @@ async function generateCanvasBackground(theme, durationSeconds, outputPath) {
 
   try {
       const page = await browser.newPage();
-      await page.goto(`file://${CANVAS_HTML}?theme=${theme}`, { waitUntil: 'networkidle0' });
+      const emotionParam = emotion ? `&emotion=${emotion}` : '';
+      await page.goto(`file://${CANVAS_HTML}?theme=${theme}${emotionParam}`, { waitUntil: 'networkidle0' });
 
       // Capture frame by frame
       for (let f = 0; f < totalFrames; f++) {

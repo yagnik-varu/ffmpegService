@@ -4,6 +4,17 @@
    Background is transparent — Puppeteer captures as WebM
    ============================================================ */
 
+/* ── Emotion Theme CSS Variables ── */
+:root {
+  --glow-color: rgba(255, 255, 255, 0.1);
+  --text-accent: #78dcff;
+}
+
+body.theme-neutral  { --glow-color: rgba(255, 255, 255, 0.05); --text-accent: #94a3b8; }
+body.theme-danger   { --glow-color: rgba(220, 38, 38, 0.4);    --text-accent: #f87171; }
+body.theme-solution { --glow-color: rgba(16, 185, 129, 0.4);   --text-accent: #34d399; }
+body.theme-curious  { --glow-color: rgba(139, 92, 246, 0.4);   --text-accent: #a78bfa; }
+
 * {
   margin: 0;
   padding: 0;
@@ -57,6 +68,7 @@ html, body {
   box-shadow:
     0 0 0 1px rgba(120, 220, 255, 0.08),
     0 32px 80px rgba(0, 0, 0, 0.55),
+    0 0 60px var(--glow-color),
     inset 0 1px 0 rgba(255,255,255,0.06);
   animation: slideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -107,6 +119,7 @@ html, body {
   box-shadow:
     0 0 0 1px rgba(180, 130, 255, 0.08),
     0 32px 80px rgba(0, 0, 0, 0.6),
+    0 0 60px var(--glow-color),
     inset 0 1px 0 rgba(255,255,255,0.05);
   animation: slideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -152,14 +165,14 @@ html, body {
 }
 
 /* ── Important Word Highlight ── */
-/* background: transparent — we highlight via glow color, not a colored box */
+/* Uses --text-accent from the active emotion theme */
 #caption-text mark.word-highlight {
   background: transparent;
-  color: #78dcff;
+  color: var(--text-accent);
   font-weight: 800;
   text-shadow:
-    0 0 20px rgba(120, 220, 255, 0.85),
-    0 0 50px rgba(120, 220, 255, 0.45);
+    0 0 20px color-mix(in srgb, var(--text-accent) 85%, transparent),
+    0 0 50px color-mix(in srgb, var(--text-accent) 45%, transparent);
 }
 
 /* ── Layout Mode: Center Text ── */

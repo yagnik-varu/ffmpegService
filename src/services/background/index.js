@@ -15,11 +15,12 @@ async function resolveBackground(scene, index, jobDir) {
   const { background } = scene;
   const { canvas_color_theme, resolved_video_url } = background;
   const { duration_seconds } = scene;
+  const emotion = scene.visual_effects?.emotion || 'neutral';
 
   if (canvas_color_theme && canvas_color_theme !== 'none') {
-    // Mode 1: Canvas
+    // Mode 1: Canvas — pass emotion so the background gradient reflects the scene's mood
     const outputPath = path.join(jobDir, `raw_scene_${index}.mp4`);
-    const finalPath = await generateCanvasBackground(canvas_color_theme, duration_seconds, outputPath);
+    const finalPath = await generateCanvasBackground(canvas_color_theme, emotion, duration_seconds, outputPath);
     return {
       type: 'canvas',
       video_path: finalPath

@@ -23,6 +23,11 @@
     canvas.classList.add('layout-center-text');
   }
 
+  // Apply emotion theme so --glow-color and --text-accent CSS vars activate
+  if (scene.emotion) {
+    document.body.classList.add(`theme-${scene.emotion}`);
+  }
+
   // ── Set caption ──
   captionText.textContent = scene.caption || '';
 
