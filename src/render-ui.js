@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
 const { splitIntoChunks } = require('./subtitle');
+const { buildHighlightedHTML } = require('./services/captions/highlightWords');
 
 const TEMPLATE_DIR = path.resolve(__dirname, '../templates');
 const TEMPLATE_HTML = path.join(TEMPLATE_DIR, 'index.html');
@@ -91,6 +92,7 @@ async function renderUIOverlay(scenes, workDir) {
             data: visual_element.data || null,
             caption: timedChunks[0]?.text || '',
             layout_mode: scene.layout_mode || 'split_bottom_captions',
+            diagram_steps: visual_element.diagram_steps || null,
         };
 
         const dataJsContent = `window.SCENE_DATA = ${JSON.stringify(sceneData)};`;
@@ -108,6 +110,33 @@ async function renderUIOverlay(scenes, workDir) {
         const totalFrames = Math.round(duration_seconds * FPS);
         let currentChunkIndex = 0;
 
+        // Read important_words once before the frame loop (no per-frame allocation)
+        const importantWords = scene.visual_effects?.important_words || [];
+
+        // ── Diagram step timing (independent of caption chunks) ──
+        // Animation finishes END_BUFFER seconds before the scene ends,
+        // giving the last revealed step time to breathe.
+        const diagramSteps = visual_element.diagram_steps;
+        const hasDiagramSteps = Array.isArray(diagramSteps) && diagramSteps.length > 0;
+        const END_BUFFER_SECONDS = 1.0;
+        let diagramStepThresholds = []; // seconds at which each step fires
+        if (hasDiagramSteps) {
+            const availableTime = Math.max(0, duration_seconds - END_BUFFER_SECONDS);
+            const stepDuration = availableTime / diagramSteps.length;
+            diagramStepThresholds = diagramSteps.map((_, idx) => idx * stepDuration);
+            console.log(`[render-ui]   Diagram steps: ${diagramSteps.length} | stepDuration: ${stepDuration.toFixed(2)}s | endBuffer: ${END_BUFFER_SECONDS}s`);
+            diagramStepThresholds.forEach((t, idx) => {
+                console.log(`[render-ui]     Step ${idx} fires at t=${t.toFixed(2)}s`);
+            });
+        }
+        let lastRevealedDiagramStep = -1;
+
+        // ── Word highlight timing ──
+        // Highlights fire HIGHLIGHT_DELAY_SECONDS after the chunk appears,
+        // giving the impression of words "lighting up" as they are spoken.
+        const HIGHLIGHT_DELAY_SECONDS = 0.3;
+        let isChunkHighlighted = false; // reset every time a new chunk appears
+
         for (let f = 0; f < totalFrames; f++) {
             // Determine which chunk this frame belongs to using start/end timestamps
             const elapsedSeconds = f / FPS;
@@ -119,13 +148,53 @@ async function renderUIOverlay(scenes, workDir) {
                 }
             }
 
-            // Update the caption text in the DOM only when the chunk changes
-            if (targetChunkIndex !== currentChunkIndex || f === 0) {
-                currentChunkIndex = targetChunkIndex;
-                const newText = timedChunks[currentChunkIndex]?.text || '';
-                await page.evaluate((text) => {
-                    document.getElementById('caption-text').textContent = text;
-                }, newText);
+            // ── Determine which diagram step should be active at this frame ──
+            let targetDiagramStep = lastRevealedDiagramStep;
+            if (hasDiagramSteps) {
+                for (let s = diagramStepThresholds.length - 1; s >= 0; s--) {
+                    if (elapsedSeconds >= diagramStepThresholds[s]) {
+                        targetDiagramStep = s;
+                        break;
+                    }
+                }
+            }
+
+            // ── Update DOM only when caption chunk OR diagram step changes ──
+            const captionChanged = (targetChunkIndex !== currentChunkIndex || f === 0);
+            const diagramStepChanged = hasDiagramSteps && (targetDiagramStep !== lastRevealedDiagramStep);
+
+            if (captionChanged || diagramStepChanged) {
+                if (captionChanged) {
+                    currentChunkIndex = targetChunkIndex;
+                    isChunkHighlighted = false; // new chunk → highlights reset
+                }
+                if (diagramStepChanged) lastRevealedDiagramStep = targetDiagramStep;
+
+                const rawText = timedChunks[currentChunkIndex]?.text || '';
+                // On chunk arrival: show plain text (no highlights yet)
+                const plainHtml = buildHighlightedHTML(rawText, []);
+                await page.evaluate((html, stepIndex, shouldRevealStep) => {
+                    document.getElementById('caption-text').innerHTML = html;
+                    if (shouldRevealStep && window.revealDiagramStep) {
+                        window.revealDiagramStep(stepIndex);
+                    }
+                }, plainHtml, lastRevealedDiagramStep, diagramStepChanged);
+            }
+
+            // ── Delayed word highlight: fire once per chunk, HIGHLIGHT_DELAY_SECONDS after it appears ──
+            if (importantWords.length > 0 && !isChunkHighlighted) {
+                const chunkStart = timedChunks[currentChunkIndex]?.start ?? 0;
+                if (elapsedSeconds >= chunkStart + HIGHLIGHT_DELAY_SECONDS) {
+                    isChunkHighlighted = true;
+                    const rawText = timedChunks[currentChunkIndex]?.text || '';
+                    const highlightedHtml = buildHighlightedHTML(rawText, importantWords);
+                    // Only do a DOM update if this chunk actually contains an important word
+                    if (highlightedHtml !== buildHighlightedHTML(rawText, [])) {
+                        await page.evaluate((html) => {
+                            document.getElementById('caption-text').innerHTML = html;
+                        }, highlightedHtml);
+                    }
+                }
             }
 
             const framePath = path.join(framesDir, `frame_${String(globalFrameIndex).padStart(6, '0')}.png`);
