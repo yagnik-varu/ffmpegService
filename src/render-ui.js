@@ -141,11 +141,20 @@ async function renderUIOverlay(scenes, workDir) {
         for (let f = 0; f < totalFrames; f++) {
             // Determine which chunk this frame belongs to using start/end timestamps
             const elapsedSeconds = f / FPS;
-            let targetChunkIndex = timedChunks.length - 1; // default to last chunk
-            for (let c = 0; c < timedChunks.length; c++) {
-                if (elapsedSeconds < timedChunks[c].end) {
-                    targetChunkIndex = c;
-                    break;
+            let targetChunkIndex = timedChunks.length > 0 ? timedChunks.length - 1 : -1;
+            if (timedChunks.length > 0) {
+                for (let c = 0; c < timedChunks.length; c++) {
+                    if (elapsedSeconds < timedChunks[c].end) {
+                        targetChunkIndex = c;
+                        break;
+                    }
+                }
+
+                // Clear caption if we are more than 0.5s past the end of the last chunk
+                if (targetChunkIndex === timedChunks.length - 1) {
+                    if (elapsedSeconds > timedChunks[targetChunkIndex].end + 0.5) {
+                        targetChunkIndex = -1;
+                    }
                 }
             }
 
@@ -168,6 +177,9 @@ async function renderUIOverlay(scenes, workDir) {
                 if (captionChanged) {
                     currentChunkIndex = targetChunkIndex;
                     isChunkHighlighted = false; // new chunk → highlights reset
+                    
+                    const logText = currentChunkIndex === -1 ? '<CLEARED>' : (timedChunks[currentChunkIndex]?.text || '');
+                    console.log(`[render-ui] Scene ${i+1} Frame ${f} (${elapsedSeconds.toFixed(2)}s) — Caption: "${logText}"`);
                 }
                 if (diagramStepChanged) lastRevealedDiagramStep = targetDiagramStep;
 

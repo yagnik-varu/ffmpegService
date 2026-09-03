@@ -228,6 +228,14 @@ function assignTimestampsToScenes(scenes, wordTimestamps) {
       }
     }
 
+    if (isLastScene && sceneWords.length > 0) {
+      const lastWord = sceneWords[sceneWords.length - 1];
+      const neededDuration = lastWord.end - currentSceneStartTime;
+      if (neededDuration > scene.duration_seconds) {
+        scene.duration_seconds = neededDuration + 0.5; // pad to fit audio
+      }
+    }
+
     // Group words into chunks
     const caption_timestamps = [];
     let currentChunkWords = [];
