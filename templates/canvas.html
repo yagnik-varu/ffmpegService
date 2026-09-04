@@ -7,26 +7,45 @@
     #bg {
       width: 100%;
       height: 100%;
-      /* Default gradient position vars */
-      --bg-x: 50%;
-      --bg-y: 50%;
-      /* Default gradient color vars — overridden by emotion/theme classes */
-      --grad-start: #1e293b;
-      --grad-end: #0f172a;
-      background: radial-gradient(circle at var(--bg-x) var(--bg-y), var(--grad-start), var(--grad-end));
+      position: relative;
+      
+      /* Default positions */
+      --x1: 50%; --y1: 20%;
+      --x2: 80%; --y2: 70%;
+      --x3: 20%; --y3: 80%;
+      
+      /* Default colors */
+      --c1: #0ea5e9; 
+      --c2: #2563eb; 
+      --c3: #1e3a8a; 
+      --bg: #0a0f1e;
+      
+      background-color: var(--bg);
+      /* Subtle centered spotlight vignette */
+      background-image: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+    }
+
+    /* Subtle grain overlay to give it a premium, organic texture */
+    #bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.05;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      pointer-events: none;
     }
 
     /* ── Emotion Themes (primary — driven by visual_effects.emotion) ── */
-    #bg.emotion-neutral  { --grad-start: #1e293b; --grad-end: #0f172a; }
-    #bg.emotion-danger   { --grad-start: #450a0a; --grad-end: #000000; }
-    #bg.emotion-solution { --grad-start: #064e3b; --grad-end: #000000; }
-    #bg.emotion-curious  { --grad-start: #2e1065; --grad-end: #000000; }
+    #bg.emotion-neutral  { --c1: #3b82f6; --c2: #8b5cf6; --c3: #1e1b4b; --bg: #0f172a; }
+    #bg.emotion-danger   { --c1: #ef4444; --c2: #991b1b; --c3: #450a0a; --bg: #090000; }
+    #bg.emotion-solution { --c1: #10b981; --c2: #047857; --c3: #064e3b; --bg: #022c22; }
+    #bg.emotion-curious  { --c1: #d946ef; --c2: #8b5cf6; --c3: #4c1d95; --bg: #1e1b4b; }
 
     /* ── Canvas Color Themes (fallback — used when no emotion provided) ── */
-    #bg.theme-cyber_blue   { --grad-start: #1a2a4c; --grad-end: #0a0f1e; }
-    #bg.theme-hacker_green { --grad-start: #1a331a; --grad-end: #0a1a0a; }
-    #bg.theme-error_red    { --grad-start: #331a1a; --grad-end: #1a0a0a; }
-    #bg.theme-dark_minimal { --grad-start: #1a1a1a; --grad-end: #0d0d0d; }
+    #bg.theme-cyber_blue   { --c1: #0ea5e9; --c2: #2563eb; --c3: #1e3a8a; --bg: #0a0f1e; }
+    #bg.theme-hacker_green { --c1: #22c55e; --c2: #166534; --c3: #14532d; --bg: #052e16; }
+    #bg.theme-error_red    { --c1: #f43f5e; --c2: #be123c; --c3: #881337; --bg: #2a0410; }
+    #bg.theme-dark_minimal { --c1: #475569; --c2: #334155; --c3: #1e293b; --bg: #0f172a; }
   </style>
 </head>
 <body id="bg"></body>
@@ -46,14 +65,8 @@
 
   // Called by Puppeteer for each frame to deterministically advance the animation
   window.advanceFrame = function(frameNumber, totalFrames) {
-    const progress = frameNumber / totalFrames; // 0.0 to 1.0
-
-    // Slow circular pan of the radial gradient
-    const x = 50 + (30 * Math.sin(progress * Math.PI * 2));
-    const y = 50 + (20 * Math.cos(progress * Math.PI * 2));
-
-    bg.style.setProperty('--bg-x', `${x}%`);
-    bg.style.setProperty('--bg-y', `${y}%`);
+    // The aurora background is removed in favor of a clean, static vignette.
+    // The cards in the UI layer now have the primary highlight animations.
   }
 </script>
 </html>

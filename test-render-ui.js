@@ -11,11 +11,42 @@ async function runTest() {
     const testScenes = [
         {
             duration_seconds: 3,
-            caption: "Welcome to our futuristic codebase!",
+            caption: "Welcome to our futuristic codebase with a huge block of code!",
             visual_element: {
                 type: "code_snippet",
                 language: "javascript",
-                data: "function futuristic() {\n  return 'Engaging UI';\n}"
+                data: `function initializeFuturisticSystem(config) {
+  console.log('Booting up sequence...');
+  
+  const systemModules = [
+    'UI Engine',
+    'Data Pipeline',
+    'AI Core',
+    'Quantum Storage'
+  ];
+
+  for(let i = 0; i < systemModules.length; i++) {
+    console.log('Loading ' + systemModules[i]);
+    // Simulating delay
+    let start = Date.now();
+    while (Date.now() - start < 100) {}
+  }
+
+  const status = {
+    modulesLoaded: systemModules.length,
+    active: true,
+    timestamp: new Date().toISOString()
+  };
+
+  if (config.debugMode) {
+    console.log('System Status:', status);
+  }
+
+  return {
+    status: status,
+    engage: () => console.log('System engaged!')
+  };
+}`
             }
         },
         {

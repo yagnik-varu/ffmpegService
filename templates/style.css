@@ -43,14 +43,12 @@ html, body {
   position: relative;
 }
 
-/* ── Visual overlay: occupies upper 60% ── */
 #visual-area {
   position: absolute;
   top: 50%;
   left: 60px;
   right: 60px;
   transform: translateY(-50%);
-  max-height: 1100px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,25 +56,26 @@ html, body {
 
 /* ── Code snippet card ── */
 .code-card {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  background: rgba(10, 10, 20, 0.82);
-  border: 1px solid rgba(120, 220, 255, 0.18);
-  border-radius: 24px;
-  padding: 48px 52px;
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid rgba(120, 220, 255, 0.22);
+  border-radius: 28px;
+  padding: 64px 72px;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   box-shadow:
     0 0 0 1px rgba(120, 220, 255, 0.08),
     0 32px 80px rgba(0, 0, 0, 0.55),
-    0 0 60px var(--glow-color),
     inset 0 1px 0 rgba(255,255,255,0.06);
   animation: slideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .code-card .lang-badge {
   display: inline-block;
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 700;
   color: rgba(120, 220, 255, 0.75);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -91,49 +90,69 @@ html, body {
   background: transparent !important;
   margin: 0;
   padding: 0;
-  font-size: 34px;
-  line-height: 1.65;
+  font-size: 44px;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 900px;
-  overflow: hidden;
   text-shadow: 0 2px 5px rgba(0, 0, 0, 0.4) !important;
 }
 
 .code-card code[class*="language-"] {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 34px;
-  font-weight: 500;
+  font-size: 44px;
+  font-weight: 600;
   letter-spacing: -0.015em;
 }
 
 /* ── Architecture diagram card ── */
 .diagram-card {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  background: rgba(5, 12, 30, 0.85);
-  border: 1px solid rgba(180, 130, 255, 0.2);
-  border-radius: 24px;
-  padding: 56px 52px;
+  background: rgba(5, 12, 30, 0.88);
+  border: 1px solid rgba(180, 130, 255, 0.25);
+  border-radius: 28px;
+  padding: 64px 72px;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   box-shadow:
     0 0 0 1px rgba(180, 130, 255, 0.08),
     0 32px 80px rgba(0, 0, 0, 0.6),
-    0 0 60px var(--glow-color),
     inset 0 1px 0 rgba(255,255,255,0.05);
   animation: slideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .diagram-card .mermaid {
   width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-/* Make Mermaid SVG white/light on dark */
+/* Make Mermaid SVG fit and use native dark theme */
 .diagram-card .mermaid svg {
   max-width: 100%;
+  max-height: 700px; /* Restrict height so graph isn't too big */
   height: auto;
-  filter: invert(1) hue-rotate(180deg) brightness(1.1);
 }
+
+/* ── macOS Window Controls ── */
+.window-controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.window-controls .dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+.window-controls .dot.red { background: #ff5f56; }
+.window-controls .dot.yellow { background: #ffbd2e; }
+.window-controls .dot.green { background: #27c93f; }
 
 /* ── Caption bar ── */
 #caption-bar {
@@ -165,14 +184,12 @@ html, body {
 }
 
 /* ── Important Word Highlight ── */
-/* Uses --text-accent from the active emotion theme */
 #caption-text mark.word-highlight {
   background: transparent;
-  color: var(--text-accent);
-  font-weight: 800;
-  text-shadow:
-    0 0 20px color-mix(in srgb, var(--text-accent) 85%, transparent),
-    0 0 50px color-mix(in srgb, var(--text-accent) 45%, transparent);
+  color: #ffea00; /* Constant vibrant yellow for all scenes */
+  font-weight: 900;
+  font-size: 115%; /* Use font-size instead of transform so layout adjusts and prevents overlap */
+  margin: 0 2px; /* Standard spacing, no need for huge margins now */
 }
 
 /* ── Layout Mode: Center Text ── */
@@ -216,6 +233,24 @@ html, body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ── Dynamic Pulsing Glow for Cards ── */
+.code-card::before, .diagram-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  box-shadow: 0 0 100px var(--glow-color);
+  opacity: 0.15;
+  z-index: -1;
+  animation: pulseOpacity 6s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes pulseOpacity {
+  0% { opacity: 0.15; transform: scale(0.99); }
+  100% { opacity: 0.6; transform: scale(1.01); }
 }
 
 /* ── Scrollbar hide ── */

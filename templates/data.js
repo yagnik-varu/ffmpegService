@@ -1,1 +1,1 @@
-window.SCENE_DATA = {"type":"text_only","language":"javascript","data":null,"caption":"Shallow copies are fast and lightweight, but only for flat data. Save this post so you don't break your state management next time!"};
+window.SCENE_DATA = {"type":"text_only","language":null,"data":null,"caption":"This is a text-only","layout_mode":"split_bottom_captions","diagram_steps":null,"emotion":null};

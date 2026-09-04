@@ -31,6 +31,20 @@
   // ── Set caption ──
   captionText.textContent = scene.caption || '';
 
+  // ── Helper: Create macOS window controls ──
+  function createWindowControls() {
+    const controls = document.createElement('div');
+    controls.className = 'window-controls';
+    
+    ['red', 'yellow', 'green'].forEach(color => {
+      const dot = document.createElement('div');
+      dot.className = `dot ${color}`;
+      controls.appendChild(dot);
+    });
+    
+    return controls;
+  }
+
   // ── Mount visual element ──
   switch (scene.type) {
 
@@ -40,6 +54,9 @@
 
       const card = document.createElement('div');
       card.className = 'code-card';
+
+      const controls = createWindowControls();
+      card.appendChild(controls);
 
       const badge = document.createElement('span');
       badge.className = 'lang-badge';
@@ -60,6 +77,15 @@
 
       // Trigger Prism highlighting
       Prism.highlightElement(codeEl);
+
+      // Auto-scale code snippet if it exceeds a reasonable max height
+      let fontSize = 44; // Base font size from style.css
+      const maxAllowedHeight = 1100; // Restrict card height
+      while (card.offsetHeight > maxAllowedHeight && fontSize > 16) {
+        fontSize -= 2;
+        pre.style.fontSize = `${fontSize}px`;
+        codeEl.style.fontSize = `${fontSize}px`;
+      }
       break;
     }
 
@@ -69,6 +95,9 @@
 
       const card = document.createElement('div');
       card.className = 'diagram-card';
+
+      const controls = createWindowControls();
+      card.appendChild(controls);
 
       const mermaidDiv = document.createElement('div');
       mermaidDiv.className = 'mermaid';
