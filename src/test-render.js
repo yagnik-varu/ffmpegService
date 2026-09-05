@@ -16,6 +16,7 @@ const { execSync } = require('child_process');
 const { resolveBackground } = require('./services/background');
 const { renderUIOverlay } = require('./render-ui');
 const { buildBackgroundBase } = require('./assemble');
+const config = require('./config');
 
 // Mock data provided by user
 const MOCK_SCENES = [
@@ -90,7 +91,7 @@ const MOCK_SCENES = [
  * Composites the background and the transparent UI overlay into a final silent video.
  */
 function compositeSilentVideo(backgroundPath, overlayPath, finalPath, totalSeconds) {
-  const vcodec = process.env.FFMPEG_VCODEC || 'libx264';
+  const vcodec = config.ffmpegVcodec;
 
   const ffmpegCmd = [
     'ffmpeg -y',

@@ -8,9 +8,11 @@
  */
 const express = require("express");
 const { render } = require("./render");
+const { validateRenderRequest } = require("./validation/renderRequestValidator");
+const config = require("./config");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = config.port;
 
 // ── Body parser ─────────────────────────────────────────
 app.use(express.json({ limit: "1mb" }));
@@ -44,73 +46,13 @@ app.get("/health", (_req, res) => {
 // ── Render endpoint ─────────────────────────────────────
 app.post("/render", async (req, res, next) => {
   try {
-    const { reel_id, total_seconds, audio_drive_file_id, scenes } = req.body;
-
-    // ── Validate required fields ────────────────────────
-    if (!reel_id || !total_seconds || !audio_drive_file_id || !Array.isArray(scenes) || scenes.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error:
-          "Missing required fields: reel_id, total_seconds, audio_drive_file_id, scenes (non-empty array)",
-      });
-    }
-
-    for (let i = 0; i < scenes.length; i++) {
-      const s = scenes[i];
-      if (!s.background || typeof s.background !== 'object' || s.caption === undefined || !s.duration_seconds) {
-        return res.status(400).json({
-          success: false,
-          error: `Scene ${i + 1} is missing required fields: background (object), caption, duration_seconds`,
-        });
-      }
-
-      const { canvas_color_theme, resolved_video_url } = s.background;
-      const validThemes = ['cyber_blue', 'hacker_green', 'error_red', 'dark_minimal', 'none'];
-      
-      if (!validThemes.includes(canvas_color_theme)) {
-        return res.status(400).json({
-          success: false,
-          error: `Scene ${i + 1} has invalid background.canvas_color_theme. Must be one of: ${validThemes.join(', ')}`,
-        });
-      }
-
-      if (canvas_color_theme === 'none' && (!resolved_video_url || typeof resolved_video_url !== 'string')) {
-        return res.status(400).json({
-          success: false,
-          error: `Scene ${i + 1} is using 'none' canvas theme but missing valid background.resolved_video_url`,
-        });
-      }
-
-      if (s.visual_element) {
-        const { type, data } = s.visual_element;
-        const validTypes = ['code_snippet', 'architecture_diagram', 'text_only'];
-        if (!type || !validTypes.includes(type)) {
-          return res.status(400).json({
-            success: false,
-            error: `Scene ${i + 1} has invalid or missing visual_element.type. Must be one of: ${validTypes.join(', ')}`,
-          });
-        }
-        if (type !== 'text_only' && typeof data !== 'string') {
-          return res.status(400).json({
-            success: false,
-            error: `Scene ${i + 1} is missing visual_element.data (must be a string) required for type '${type}'`,
-          });
-        }
-      }
-
-      if (s.layout_mode) {
-        const validLayouts = ['center_text', 'split_bottom_captions'];
-        if (!validLayouts.includes(s.layout_mode)) {
-          return res.status(400).json({
-            success: false,
-            error: `Scene ${i + 1} has invalid layout_mode. Must be one of: ${validLayouts.join(', ')}`,
-          });
-        }
-      }
+    const { valid, error } = validateRenderRequest(req.body);
+    if (!valid) {
+      return res.status(400).json({ success: false, error });
     }
 
     // ── Run pipeline ────────────────────────────────────
-    console.log(`[server] Render request accepted for reel ${reel_id}`);
+    console.log(`[server] Render request accepted for reel ${req.body.reel_id}`);
     const result = await render(req.body);
 
     return res.json({
@@ -145,8 +87,8 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`\n======================================================`);
   console.log(`ffmpeg-service listening on port ${PORT}`);
-  console.log(`Google Service Account Key: ${process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "not configured"}`);
-  console.log(`Target Google Drive Folder: ${process.env.GOOGLE_DRIVE_FOLDER_ID || "not configured"}`);
+  console.log(`Google Service Account Key: ${config.googleServiceAccountJson || "not configured"}`);
+  console.log(`Target Google Drive Folder: ${config.googleDriveFolderId || "not configured"}`);
   console.log(`======================================================\n`);
 });
 

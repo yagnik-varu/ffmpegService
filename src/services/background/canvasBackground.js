@@ -1,7 +1,8 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
+const { launchBrowser } = require('../browser');
+const config = require('../../config');
 
 const TEMPLATE_DIR = path.resolve(__dirname, '../../../templates');
 const CANVAS_HTML = path.join(TEMPLATE_DIR, 'canvas.html');
@@ -17,31 +18,15 @@ const FPS = 30;
  * @returns {Promise<string>}      - The path to the generated MP4
  */
 async function generateCanvasBackground(theme, emotion, durationSeconds, outputPath) {
-  const vcodec = process.env.FFMPEG_VCODEC || 'libx264';
+  const vcodec = config.ffmpegVcodec;
   const jobDir = path.dirname(outputPath);
-  
+
   console.log(`[canvasBackground] Generating animated canvas (theme: ${theme} | emotion: ${emotion}) for ${durationSeconds}s...`);
 
   const framesDir = path.join(jobDir, `canvas_frames_${path.basename(outputPath, '.mp4')}`);
   fs.mkdirSync(framesDir, { recursive: true });
 
-  const browserOptions = {
-      headless: true,
-      args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--window-size=1080,1920',
-      ],
-      defaultViewport: { width: 1080, height: 1920 },
-  };
-
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      browserOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  }
-
-  const browser = await puppeteer.launch(browserOptions);
+  const browser = await launchBrowser();
   const totalFrames = Math.round(durationSeconds * FPS);
 
   try {

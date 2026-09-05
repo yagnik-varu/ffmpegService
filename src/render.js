@@ -19,6 +19,7 @@ const { renderUIOverlay } = require("./render-ui");
 const { buildBackgroundBase, compositeFinalReel } = require("./assemble");
 const { uploadToDrive, getAuthClient } = require("./upload");
 const { resolveBackground } = require("./services/background");
+const config = require("./config");
 
 /**
  * Run the full render pipeline for a single reel.
@@ -138,7 +139,7 @@ async function render(body) {
     // ── 5. Upload OR save locally ───────────────────────────
     const skipUpload = body.skip_drive_upload !== undefined
       ? String(body.skip_drive_upload) === "true"
-      : process.env.SKIP_DRIVE_UPLOAD === "true";
+      : config.skipDriveUploadEnv;
 
     if (skipUpload) {
       // ── Local mode: copy to /app/output (mounted from host ./output) ─

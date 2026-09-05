@@ -1,10 +1,11 @@
 
-const puppeteer = require('puppeteer');
 const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
 const { splitIntoChunks } = require('./subtitle');
 const { buildHighlightedHTML } = require('./services/captions/highlightWords');
+const { buildProportionalTimedChunks } = require('./services/captions/captionTiming');
+const { launchBrowser } = require('./services/browser');
 
 const TEMPLATE_DIR = path.resolve(__dirname, '../templates');
 const TEMPLATE_HTML = path.join(TEMPLATE_DIR, 'index.html');
@@ -20,26 +21,9 @@ async function renderUIOverlay(scenes, workDir) {
     const framesDir = path.join(workDir, 'ui_frames');
     fs.mkdirSync(framesDir, { recursive: true });
 
-    const browserOptions = {
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--window-size=1080,1920',
-            // Allow transparent background rendering
-            '--force-color-profile=srgb',
-        ],
-        defaultViewport: { width: 1080, height: 1920 },
-    };
-
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-        browserOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
-
     console.log('[render-ui] Launching Chromium...');
-    const browser = await puppeteer.launch(browserOptions);
+    // Allow transparent background rendering
+    const browser = await launchBrowser(['--force-color-profile=srgb']);
 
     let globalFrameIndex = 0;
 
@@ -69,15 +53,7 @@ async function renderUIOverlay(scenes, workDir) {
                 ? scene.caption_chunks
                 : splitIntoChunks(caption || '');
 
-            const totalChars = chunks.reduce((sum, c) => sum + c.length, 0);
-            let cursor = 0;
-            timedChunks = chunks.map(chunk => {
-                const ratio = totalChars > 0 ? (chunk.length / totalChars) : (1 / chunks.length);
-                const chunkDuration = duration_seconds * ratio;
-                const entry = { text: chunk, start: cursor, end: cursor + chunkDuration };
-                cursor += chunkDuration;
-                return entry;
-            });
+            timedChunks = buildProportionalTimedChunks(chunks, duration_seconds);
             console.log(`[render-ui]   Using proportional timing (no TTS timestamps): ${timedChunks.length} chunks`);
         }
 
